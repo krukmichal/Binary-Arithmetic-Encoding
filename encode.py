@@ -11,6 +11,7 @@
 
 import math
 from bitarray import bitarray
+from bitarray.util import ba2int, int2ba
 
 def calc_prob(words):
     dct = dict()
@@ -39,34 +40,36 @@ def calc_prob(words):
 #(0 - 0.3) * 255 = 0 - 
 #(0, 76)
 def encode(word, dct, size):
-    left = bitarray("0"*8)
-    right = bitarray("1"*8)
+    left = bitarray("0"*size)
+    right = bitarray("1"*size)
 
     encoded = ""
 
     for ch in word:
         #print(ch)
-        left = math.ceil(left + (right-left + 1) * dct[ch][0])
-        right = math.ceil(left + (right-left + 1) * dct[ch][1])
+        oldleft = left
+        left = int2ba(math.ceil(ba2int(left) + (ba2int(right)-ba2int(left) + 1) * dct[ch][0]), length=8)
+        right = int2ba(math.ceil(ba2int(oldleft) + (ba2int(right)-ba2int(oldleft) + 1) * dct[ch][1]), length=8)
         #print(left)
         #print(right)
 
-        for i in range(size - 1, 0, -1):
-            x = pow(2, i)
-            if left & x == right & x:
-            else: 
-                break
+        x = bitarray("1"*size)
+        while (left & x) >> 7 == (right & x) >> 7:
+            encoded += str(ba2int((left & x) >> 7))
+            left = left << 1
+            right = (right << 1) | bitarray("00000001")
 
-    print(encoded)
+             
+
     return encoded
 
 
 if __name__ == "__main__":
-    #print(calc_prob(["aaa", "bbbb", "ccc"],255))
-    #prob_table = calc_prob(["0101"])
-    #print(encode("a", prob_table, 8))
-    ba = bitarray("10101010")
-    print(ba)
-    ba = ba << 1
-    print(ba)
+    prob_table = calc_prob(["ab", "aa", "bb", "bc", "cc"])
+    print(prob_table)
+    print(encode("bb", prob_table, 8))
+    # ba = int2ba(ba2int(bitarray("100")) - ba2int(bitarray("001")), length=8)
+    # print(ba)
+    # ba = (ba << 1) | bitarray("00000001")
+    # print(ba)
 
