@@ -1,7 +1,8 @@
-from encode import *
-from decode import *
+from arithmetic_encoding import *
 
 if __name__ == "__main__":
-    encoded, cum_count = encode(b"ARYTMETYKA")
+    word = b"adfgjoahrgb"
+    cum_count = calculate_cum_count(word)
+    encoded = encode(b"adfgjoahrgb", cum_count)
     decoded = decode(encoded, cum_count)
     print(decoded)
