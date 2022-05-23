@@ -1,75 +1,66 @@
-#010110
-# 01010 111 000110 1101 1010 101010 10 1001 01
-
-#1.
-# aaabbbbccc
-# dct['a'] = 0.3 
-# dct['b'] = 0.4
-
-#2.
-# 
-
-import math
 from bitarray import bitarray
-from bitarray.util import ba2int, int2ba
+from math import floor
+from helper_functions import *
 
-def calc_prob(words):
-    dct = dict()
-    sum_chars = 0;
+def encode(seq):
 
-    for word in words:
-        sum_chars += len(word)
+    count = [] 
+    cum_count = [] 
+    outbytes = [] 
+    scale3 = 0 
+    lower = 0 
+    upper = 255 
 
-        for ch in word:
-            dct[ch] = dct.get(ch,0) + 1
+    count = zero_out(count,256) 
+    count,total_count = fill(count,seq)
+    cum_count = zero_out(cum_count, 257) 
+    cum_count = cdf(count, cum_count) 
 
-    res = dict()
-    dct_sum = 0
-    for key in dct:
-        dct[key] = dct[key] / sum_chars
-        #res[key] = (round(dct_sum * size), round((dct[key] + dct_sum)* size))
-        res[key] = (dct_sum, dct[key] + dct_sum)
-        dct_sum += dct[key]
+    for byte in seq: 
+        bin_low = bin(lower)[2:].zfill(8)
+        bin_up = bin(upper)[2:].zfill(8)
 
-    return res
+        lower_old = lower
+        upper_old = upper
+        lower = floor(lower_old + ((upper_old - lower_old  +1) * cum_count[byte]) / total_count) 
+        upper = floor(lower_old + (((upper_old - lower_old + 1) * cum_count[byte + 1]) / total_count) - 1)
 
+        bin_low = bin(lower)[2:].zfill(8)
+        bin_up = bin(upper)[2:].zfill(8)
 
+        while ( (bin_low[0] == bin_up[0]) or ((bin_low[1] == '1') and (bin_up[1] == '0')) ):
+            bin_low = bin(lower)[2:].zfill(8)
+            bin_up = bin(upper)[2:].zfill(8)
 
+            if bin_low[0] == bin_up[0]:
+                outbytes.append(bin_low[0]) 
+                lower = int(bin_low[1:8] + '0', base = 2) 
+                upper = int(bin_up[1:8] + '1', base = 2) 
 
-#aaa
-#(0 - 0.3) * 255 = 0 - 
-#(0, 76)
-def encode(word, dct, size):
-    left = bitarray("0"*size)
-    right = bitarray("1"*size)
+                while scale3 > 0:
+                    outbytes.append(giveCoB(bin_low))
+                    scale3 += -1
 
-    encoded = ""
+            else:
+                if ((bin_low[1] == '1') and (bin_up[1] == '0') ): 
+                    lower = int(bin_low[0] + bin_low[2:8] + '0', base = 2) 
+                    upper = int(bin_up[0] + bin_up[2:8] + '1', base = 2) 
+                    bin_low = bin(lower)[2:].zfill(8)
+                    bin_up = bin(upper)[2:].zfill(8)
+                    scale3 += 1
 
-    for ch in word:
-        #print(ch)
-        oldleft = left
-        left = int2ba(math.ceil(ba2int(left) + (ba2int(right)-ba2int(left) + 1) * dct[ch][0]), length=8)
-        right = int2ba(math.ceil(ba2int(oldleft) + (ba2int(right)-ba2int(oldleft) + 1) * dct[ch][1]), length=8)
-        #print(left)
-        #print(right)
+    outbytes.append(bin_low[0])
 
-        x = bitarray("1"*size)
-        while (left & x) >> 7 == (right & x) >> 7:
-            encoded += str(ba2int((left & x) >> 7))
-            left = left << 1
-            right = (right << 1) | bitarray("00000001")
+    while scale3 > 0:
+        outbytes.append('1')
+        scale3 += -1
 
-             
+    outbytes.append(bin_low[1:8])
 
-    return encoded
+    out = "".join(outbytes)
 
-
-if __name__ == "__main__":
-    prob_table = calc_prob(["ab", "aa", "bb", "bc", "cc"])
-    print(prob_table)
-    print(encode("bb", prob_table, 8))
-    # ba = int2ba(ba2int(bitarray("100")) - ba2int(bitarray("001")), length=8)
-    # print(ba)
-    # ba = (ba << 1) | bitarray("00000001")
-    # print(ba)
-
+    output = bitarray(out)
+    outbytes = out
+    outstuff = output.tobytes()
+    
+    return (outstuff, cum_count)
