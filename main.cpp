@@ -8,9 +8,9 @@
 #include <chrono>
 #include <random>
 
-#define BITS 4294967296
-#define HALF_BITS 2147483648
-#define QUARTER_BITS 1073741824
+#define BITS 0x100000000
+#define HALF_BITS 0x80000000
+#define QUARTER_BITS 0x40000000
 
 
 std::vector<unsigned char> read_file_bytes(std::string filename)
@@ -110,7 +110,6 @@ std::vector<unsigned char> binary_encode(std::vector<unsigned char> bytes, unsig
 	unsigned int lower = 0;
 	unsigned long long width = 4294967296;
 	unsigned int scale3 = 0;
-	double coefficient = (double)c1 / (double)(c1 + c2);
 
 	for (auto byte : bytes)
 	{
@@ -118,7 +117,7 @@ std::vector<unsigned char> binary_encode(std::vector<unsigned char> bytes, unsig
 		for (int i = 7; i >= 0; --i)
 		{
 			bool bit = b[i];
-			unsigned long long r1 = width * coefficient;
+			unsigned long long r1 = width * c1/(unsigned long long)(c1 + c2);
 			unsigned long long r2 = width - r1;
 
 			if (bit)
@@ -155,7 +154,7 @@ void normalize_decode(unsigned int& lower, unsigned int& input_buffer, unsigned 
 		lower <<= 1;
 		width <<= 1;
 
-		unsigned int next_input_bit;
+		unsigned char next_input_bit;
 		if (seen_bits < encoded.size())
 		{
 			next_input_bit = encoded[seen_bits];
@@ -176,7 +175,6 @@ std::vector<unsigned char> binary_decode(std::vector<unsigned char> encoded, uns
 	
 	unsigned int lower = 0;
 	unsigned long long width = 4294967296;
-	double coefficient = (double)c1 / (double)(c1 + c2);
 
 	std::vector<unsigned char> input_array(encoded.begin(), encoded.begin() + 32);
 	unsigned int k = 0;
@@ -190,13 +188,13 @@ std::vector<unsigned char> binary_decode(std::vector<unsigned char> encoded, uns
 	
 	while (k < c1 + c2) 
 	{
-		unsigned long long r1 = width * coefficient;
+		unsigned long long r1 = width * c1 / (unsigned long long)(c1 + c2);
 		unsigned long long r2 = width - r1;
 
-		if (input_buffer - lower >= r2) 
+		if ((unsigned long long)(input_buffer - lower) >= r2) 
 		{
 			width = r1;
-			lower += r2;
+			lower = lower + r2;
 			decoded.push_back(1);
 		}
 		else 
@@ -208,6 +206,30 @@ std::vector<unsigned char> binary_decode(std::vector<unsigned char> encoded, uns
 		k += 1;
 	}
 	return decoded;
+}
+
+double binary_entropy(unsigned char c1, unsigned char c2)
+{
+	double p1 = (double)c1 / (double)(c1 + c2);
+	double p2 = (double)c2 / (double)(c1 + c2);
+	return -p1 * log2(p1) - p2 * log2(p2);
+}
+
+
+double entropy(std::vector<unsigned char> bytes)
+{
+	std::map<unsigned char, unsigned int> histogram;
+	for (auto byte : bytes)
+	{
+		histogram[byte] += 1;
+	}
+	double entropy = 0;
+	for (auto& pair : histogram)
+	{
+		double p = (double)pair.second / (double)bytes.size();
+		entropy += p * log2(p);
+	}
+	return -entropy;
 }
 
 void test_file(std::vector<unsigned char> bytes, std::string out_file)
@@ -251,6 +273,8 @@ void test_file(std::vector<unsigned char> bytes, std::string out_file)
 	std::cout << "Compression ratio: " << (double)encoded.size() / (double)(bytes.size() * 8) << std::endl;
 	std::cout << "Compression factor: " << (double)(bytes.size() * 8) / (double)encoded.size() << std::endl;
 	std::cout << "Saving percentage: " << (double)(bytes.size() * 8 - encoded.size()) / (double)(bytes.size() * 8) << std::endl;
+	std::cout << "Entropy: " << entropy(bytes) << std::endl;
+	std::cout << "Binary entropy: " << binary_entropy(counts.first, counts.second) << std::endl;
 	std::cout << "Encode time: " << encode_time.count() << " ns" << std::endl;
 	std::cout << "Decode time: " << decode_time.count() << " ns" << std::endl;
 	if (bytes == decoded_file)
@@ -277,21 +301,40 @@ void test_all_files()
 		"lena.pgm",	"mandril.pgm", "peppers.pgm"
 	};
 
+	std::vector<std::string> natural_images = {
+		"obraz_naturalny_1.jpg", "obraz_naturalny_2.jpg", "obraz_naturalny_3.jpg",
+		"obraz_naturalny_4.jpg", "obraz_naturalny_5.jpg", "obraz_naturalny_6.jpg"
+	};
+
+	std::cout << "Distributions" << std::endl;
 	for (int i = 0; i < distributions.size(); ++i)
 	{
-		std::vector<unsigned char> bytes = read_file_bytes("data/" + distributions[i]);
+		std::vector<unsigned char> bytes = read_file_bytes("data/distributions/" + distributions[i]);
 		std::cout << "File: " << distributions[i] << std::endl;
 		std::string file_path = "out/distributions/" + distributions[i];
 		test_file(bytes, file_path);
 	}
+	std::cout << std::endl;
 
+	std::cout << "Images" << std::endl;
 	for (int i = 0; i < images.size(); ++i)
 	{
-		std::vector<unsigned char> bytes = read_file_bytes("data/" + images[i]);
+		std::vector<unsigned char> bytes = read_file_bytes("data/images/" + images[i]);
 		std::cout << "File: " << images[i] << std::endl;
 		std::string file_path = "out/images/" + images[i];
 		test_file(bytes, file_path);
 	}
+	std::cout << std::endl;
+	
+	std::cout << "Natural images" << std::endl;
+	for (int i = 0; i < natural_images.size(); ++i)
+	{
+		std::vector<unsigned char> bytes = read_file_bytes("data/natural-images/" + natural_images[i]);
+		std::cout << "File: " << natural_images[i] << std::endl;
+		std::string file_path = "out/natural-images/" + natural_images[i];
+		test_file(bytes, file_path);
+	}
+	std::cout << std::endl;
 }
 
 int main()
