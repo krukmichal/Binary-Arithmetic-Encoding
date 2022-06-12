@@ -337,19 +337,6 @@ void test_all_files()
 	std::cout << std::endl;
 }
 
-std::vector<unsigned char> random_bytes(unsigned int count) 
-{
-	std::random_device device;
-	std::mt19937 generator(device());
-	std::uniform_int_distribution<unsigned int> distribution(0, 255);
-	std::vector<unsigned char> bytes;
-	for (int i = 0; i < count; ++i)
-	{
-		bytes.push_back(distribution(generator));
-	}
-	return bytes;
-}
-
 int main()
 {
 	test_all_files();
